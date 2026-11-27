@@ -1840,6 +1840,390 @@ if (!FIREBASE_READY) {
     else { stopListeners(); pkReset(); GX.wallet = null; state.me = null; state.profile = null; const m = state.loginError; state.loginError = ''; renderLogin(m); }
   });
 }
+  /* ===== 3.1a. Trùng tu UI Mobile & Admin Add Xu (Patch an toàn) ===== */
+(function initModule31a() {
+  'use strict';
+
+  /* --- 1. TIÊM CSS TRÙNG TU GIAO DIỆN MOBILE DỌC HIỆN ĐẠI --- */
+  function injectModernMobileStyles() {
+    try {
+      if (document.getElementById('got-style-31a')) return;
+      const style = document.createElement('style');
+      style.id = 'got-style-31a';
+      style.textContent = `
+        /* Nền tổng thể & khoảng cách đáy an toàn cho thanh 5 tab dưới cùng */
+        body {
+          background: #f4f7fb !important;
+          color: #1e293b;
+          -webkit-tap-highlight-color: transparent;
+        }
+        main, .main-content, #app-content, .tab-content, .page-section {
+          padding-bottom: calc(96px + env(safe-area-inset-bottom, 16px)) !important;
+        }
+
+        /* Thẻ Card phân tầng gọn gàng, bo góc chuẩn mobile */
+        .card, .exam-card, .post-card, .box, .panel, .wallet-card, .stat-card {
+          background: #ffffff !important;
+          border-radius: 16px !important;
+          border: 1px solid #e2e8f0 !important;
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04) !important;
+          padding: 16px !important;
+          margin-bottom: 14px !important;
+          transition: transform 0.16s ease, box-shadow 0.16s ease;
+        }
+        .card:active, .exam-card:active {
+          transform: scale(0.992);
+        }
+
+        /* Hệ thống nút bấm to rõ, dễ chạm ngón tay, phân cấp chính/phụ */
+        button, .btn {
+          min-height: 44px;
+          border-radius: 12px !important;
+          font-weight: 600 !important;
+          letter-spacing: 0.01em;
+          transition: all 0.18s ease !important;
+          touch-action: manipulation;
+        }
+        .btn-primary, button[type="submit"] {
+          background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+          color: #ffffff !important;
+          border: none !important;
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25) !important;
+        }
+        .btn-primary:active, button[type="submit"]:active {
+          transform: translateY(1px);
+          box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2) !important;
+        }
+        .btn-secondary, .btn-outline {
+          background: #f8fafc !important;
+          color: #334155 !important;
+          border: 1.5px solid #cbd5e1 !important;
+        }
+
+        /* Input thoáng, chống zoom tự động trên iOS Safari (font >= 16px) */
+        input, select, textarea {
+          font-size: 16px !important;
+          border-radius: 12px !important;
+          border: 1.5px solid #cbd5e1 !important;
+          padding: 11px 14px !important;
+          background: #ffffff !important;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        input:focus, select:focus, textarea:focus {
+          outline: none !important;
+          border-color: #2563eb !important;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14) !important;
+        }
+
+        /* Khu vực Admin Add Xu Test */
+        #admin-add-xu-card {
+          background: linear-gradient(145deg, #fffbeb, #fef3c7) !important;
+          border: 1.5px solid #f59e0b !important;
+          border-radius: 16px;
+          padding: 16px;
+          margin: 14px 0;
+          box-shadow: 0 6px 18px rgba(245, 158, 11, 0.12);
+        }
+        .admin-xu-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 10px;
+        }
+        .admin-xu-badge {
+          background: #d97706;
+          color: #fff;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 3px 9px;
+          border-radius: 999px;
+          text-transform: uppercase;
+        }
+        .admin-xu-quick-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+          margin-bottom: 10px;
+        }
+        .btn-xu-quick {
+          background: #ffffff !important;
+          color: #b45309 !important;
+          border: 1.5px solid #fcd34d !important;
+          font-size: 14px !important;
+          min-height: 42px !important;
+          padding: 0 8px !important;
+        }
+        .btn-xu-quick:active {
+          background: #fef3c7 !important;
+          transform: scale(0.97);
+        }
+        .admin-xu-custom-row {
+          display: flex;
+          gap: 8px;
+          align-items: stretch;
+        }
+        .admin-xu-custom-row input {
+          flex: 1;
+          min-width: 0;
+          border-color: #fcd34d !important;
+        }
+        .btn-xu-submit {
+          background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+          color: #ffffff !important;
+          border: none !important;
+          padding: 0 16px !important;
+          white-space: nowrap;
+        }
+      `;
+      document.head.appendChild(style);
+    } catch (err) {
+      console.warn('[3.1a] Lỗi tiêm CSS:', err);
+    }
+  }
+
+  /* --- 2. KIỂM TRA QUYỀN ADMIN / QUẢN TRỊ VIÊN --- */
+  function isCurrentUserAdmin() {
+    try {
+      // Kiểm tra các biến/cờ phân quyền phổ biến từ bản 2.2b
+      if (typeof window.isAdmin !== 'undefined' && Boolean(window.isAdmin)) return true;
+      if (typeof window.currentUserRole !== 'undefined') {
+        const r = String(window.currentUserRole).toLowerCase();
+        if (r === 'admin' || r === 'quantrivien' || r === 'superadmin') return true;
+      }
+
+      const userObj = window.currentUser || window.userProfile || null;
+      if (userObj && typeof userObj === 'object') {
+        const role = String(userObj.role || userObj.vaiTro || '').toLowerCase();
+        if (role === 'admin' || role === 'quantrivien' || userObj.isAdmin === true) return true;
+
+        // So khớp danh sách email/UID admin nếu app có khai báo
+        const adminList = window.ADMIN_EMAILS || window.ADMIN_UIDS || [];
+        if (Array.isArray(adminList) && adminList.length > 0) {
+          const email = String(userObj.email || '').toLowerCase();
+          const uid = String(userObj.uid || userObj.id || '');
+          if ((email && adminList.map(e => String(e).toLowerCase()).includes(email)) ||
+              (uid && adminList.includes(uid))) {
+            return true;
+          }
+        }
+      }
+
+      // Kiểm tra DOM nếu tab/panel Admin đang được mở khóa hiển thị
+      const adminNav = document.querySelector('[data-tab="admin"], #tab-admin, #admin-panel');
+      if (adminNav && !adminNav.classList.contains('hidden') && adminNav.style.display !== 'none') {
+        // Chỉ xác nhận nếu không phải trạng thái mặc định ẩn
+        if (adminNav.dataset.unlocked === 'true' || localStorage.getItem('got_is_admin') === 'true') {
+          return true;
+        }
+      }
+
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /* --- 3. XỬ LÝ CỘNG XU & ĐỒNG BỘ SỐ DƯ --- */
+  function getCoinStorageKeys() {
+    const keys = ['got_coins', 'userCoins', 'coins', 'xu'];
+    try {
+      const uid = window.currentUser && (window.currentUser.uid || window.currentUser.id);
+      if (uid) {
+        keys.unshift(`got_coins_${uid}`, `coins_${uid}`);
+      }
+    } catch (_) {}
+    return keys;
+  }
+
+  function readCurrentCoins() {
+    try {
+      if (typeof window.userCoins === 'number' && !isNaN(window.userCoins)) return window.userCoins;
+      if (typeof window.coins === 'number' && !isNaN(window.coins)) return window.coins;
+
+      const keys = getCoinStorageKeys();
+      for (let i = 0; i < keys.length; i++) {
+        const raw = localStorage.getItem(keys[i]);
+        if (raw !== null && raw !== '' && !isNaN(Number(raw))) {
+          return Number(raw);
+        }
+      }
+    } catch (_) {}
+    return 0;
+  }
+
+  function syncCoinsUI(newBalance) {
+    try {
+      // Cập nhật biến global nếu có
+      if (typeof window.userCoins !== 'undefined') window.userCoins = newBalance;
+      if (typeof window.coins !== 'undefined') window.coins = newBalance;
+      if (window.userProfile && typeof window.userProfile === 'object') {
+        window.userProfile.coins = newBalance;
+        window.userProfile.xu = newBalance;
+      }
+
+      // Cập nhật tất cả phần tử hiển thị số dư xu trên giao diện
+      const selectors = [
+        '#user-coins', '#coin-balance', '#wallet-coins', '#header-coins',
+        '.coin-count', '.xu-balance', '[data-coin-display]'
+      ];
+      selectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => {
+          if (el) el.textContent = newBalance.toLocaleString('vi-VN');
+        });
+      });
+
+      // Gọi hàm render ví cũ của app nếu tồn tại
+      if (typeof window.updateWalletUI === 'function') window.updateWalletUI();
+      if (typeof window.renderWallet === 'function') window.renderWallet();
+    } catch (e) {
+      console.warn('[3.1a] Lỗi cập nhật UI xu:', e);
+    }
+  }
+
+  async function adminAddCoins(amount) {
+    try {
+      if (!isCurrentUserAdmin()) {
+        alert('Chức năng này chỉ dành riêng cho Quản trị viên!');
+        return;
+      }
+
+      const delta = parseInt(amount, 10);
+      if (isNaN(delta) || delta <= 0) {
+        alert('Vui lòng nhập số xu hợp lệ lớn hơn 0.');
+        return;
+      }
+      if (delta > 1000000) {
+        alert('Mức cộng test tối đa mỗi lần là 1.000.000 xu.');
+        return;
+      }
+
+      const current = readCurrentCoins();
+      const updated = current + delta;
+
+      // 1. Lưu bền vững vào localStorage để giữ nguyên khi reload
+      const keys = getCoinStorageKeys();
+      keys.forEach(k => {
+        try { localStorage.setItem(k, String(updated)); } catch (_) {}
+      });
+
+      // 2. Cập nhật ngay UI
+      syncCoinsUI(updated);
+
+      // 3. Đồng bộ nhẹ lên Firebase Firestore nếu đang kết nối & đã đăng nhập
+      try {
+        const uid = window.currentUser && window.currentUser.uid;
+        if (uid && window.db && typeof window.db.collection === 'function') {
+          await window.db.collection('users').doc(uid).set({
+            coins: updated,
+            xu: updated,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        }
+      } catch (fbErr) {
+        console.warn('[3.1a] Đồng bộ Firebase tạm thời bỏ qua (đã lưu local):', fbErr);
+      }
+
+      // Thông báo phản hồi
+      if (typeof window.showToast === 'function') {
+        window.showToast(`Đã cộng +${delta.toLocaleString('vi-VN')} xu test! Số dư: ${updated.toLocaleString('vi-VN')} xu`);
+      } else {
+        alert(`✅ Đã cộng +${delta.toLocaleString('vi-VN')} xu!\nSố dư hiện tại: ${updated.toLocaleString('vi-VN')} xu`);
+      }
+    } catch (err) {
+      console.error('[3.1a] Lỗi adminAddCoins:', err);
+    }
+  }
+
+  /* --- 4. DỰNG KHỐI NÚT ADD XU TRONG KHU VỰC VÍ / TÀI KHOẢN --- */
+  function renderAdminAddXuWidget() {
+    try {
+      const existing = document.getElementById('admin-add-xu-card');
+      const isAdmin = isCurrentUserAdmin();
+
+      // Ẩn hoặc gỡ bỏ hoàn toàn nếu không phải Admin
+      if (!isAdmin) {
+        if (existing) existing.remove();
+        return;
+      }
+
+      // Nếu đã render rồi thì giữ nguyên
+      if (existing) return;
+
+      // Tìm vị trí gắn phù hợp trong tab Ví xu / Tiến độ / Trang cá nhân
+      const targetContainer =
+        document.querySelector('#wallet-section, #tab-wallet, #section-wallet, .wallet-container') ||
+        document.querySelector('#profile-section, #tab-profile, #section-progress, main');
+
+      if (!targetContainer) return;
+
+      const card = document.createElement('div');
+      card.id = 'admin-add-xu-card';
+      card.innerHTML = `
+        <div class="admin-xu-header">
+          <strong style="color:#92400e;font-size:15px;">🛠️ Công cụ Admin: Add Xu Test</strong>
+          <span class="admin-xu-badge">Admin Only</span>
+        </div>
+        <div class="admin-xu-quick-grid">
+          <button type="button" class="btn btn-xu-quick" data-add-xu="50">+50 xu</button>
+          <button type="button" class="btn btn-xu-quick" data-add-xu="100">+100 xu</button>
+          <button type="button" class="btn btn-xu-quick" data-add-xu="500">+500 xu</button>
+        </div>
+        <div class="admin-xu-custom-row">
+          <input type="number" id="admin-custom-xu-input" min="1" max="1000000" inputmode="numeric" placeholder="Nhập số xu tùy ý..." />
+          <button type="button" id="admin-custom-xu-btn" class="btn btn-xu-submit">Add xu</button>
+        </div>
+      `;
+
+      targetContainer.insertBefore(card, targetContainer.firstChild);
+
+      // Gắn sự kiện nút cộng nhanh
+      card.querySelectorAll('[data-add-xu]').forEach(btn => {
+        btn.addEventListener('click', function () {
+          const val = this.getAttribute('data-add-xu');
+          adminAddCoins(val);
+        });
+      });
+
+      // Gắn sự kiện nhập tùy ý
+      const customBtn = document.getElementById('admin-custom-xu-btn');
+      const customInput = document.getElementById('admin-custom-xu-input');
+      if (customBtn && customInput) {
+        customBtn.addEventListener('click', function () {
+          adminAddCoins(customInput.value);
+          customInput.value = '';
+        });
+      }
+    } catch (err) {
+      console.warn('[3.1a] Lỗi render widget Admin Add Xu:', err);
+    }
+  }
+
+  /* --- 5. KHỞI CHẠY & ĐỒNG BỘ KHI TẢI TRANG / ĐỔI TRẠNG THÁI AUTH --- */
+  function bootstrap31a() {
+    injectModernMobileStyles();
+    const saved = readCurrentCoins();
+    if (saved > 0) syncCoinsUI(saved);
+    renderAdminAddXuWidget();
+  }
+
+  // Xuất hàm ra global để các tab hoặc sự kiện auth của bản 2.2b có thể gọi lại nếu cần
+  window.refreshAdminXuTool = renderAdminAddXuWidget;
+  window.adminAddCoinsTest = adminAddCoins;
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrap31a);
+  } else {
+    bootstrap31a();
+  }
+
+  // Theo dõi nhẹ khi Firebase Auth xác thực xong quyền Admin sau khi load trang
+  let authCheckCount = 0;
+  const authPoll = setInterval(() => {
+    authCheckCount++;
+    renderAdminAddXuWidget();
+    if (authCheckCount >= 10) clearInterval(authPoll);
+  }, 1000);
+})();
 </script>
 </body>
 </html>
